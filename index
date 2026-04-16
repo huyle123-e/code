@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CODE Pro - Marisa & Codeforces Roadmap</title>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <style>
+        :root { --primary: #3b82f6; --success: #10b981; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; line-height: 1.6; }
+        .container { max-width: 1000px; margin: auto; }
+        input, button, textarea { padding: 12px; border-radius: 8px; border: 1px solid #334155; margin: 8px 0; width: 100%; box-sizing: border-box; font-size: 14px; }
+        button { background: var(--primary); color: white; cursor: pointer; border: none; font-weight: bold; transition: 0.3s; }
+        button:hover { filter: brightness(1.2); }
+        
+        /* Dashboard Stats */
+        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+        .stat-box { background: var(--card); padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #334155; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .progress-bg { background: #334155; height: 12px; border-radius: 10px; margin-top: 10px; overflow: hidden; }
+        #progress-fill { background: linear-gradient(90deg, var(--primary), var(--success)); width: 0%; height: 100%; transition: 0.8s ease-in-out; }
+        
+        /* Roadmap Styling */
+        .level-card { background: var(--card); margin-bottom: 25px; border-radius: 12px; padding: 20px; border: 1px solid #334155; }
+        .topic-title { color: #94a3b8; font-size: 0.9rem; margin: 15px 0 8px 0; display: block; border-left: 3px solid var(--primary); padding-left: 10px; }
+        .task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+        .task-item { background: #0f172a; padding: 12px; border-radius: 8px; display: flex; align-items: center; border: 1px solid #1e293b; transition: 0.2s; }
+        .task-item:hover { border-color: var(--primary); transform: translateY(-2px); }
+        .task-item.completed { border-color: var(--success); opacity: 0.8; background: #064e3b10; }
+        
+        .cf-link { color: #60a5fa; text-decoration: none; font-weight: 500; flex-grow: 1; margin-left: 10px; }
+        .rating-tag { font-size: 0.75rem; background: #334155; padding: 2px 6px; border-radius: 4px; color: #fbbf24; margin-left: 5px; }
+        
+        .log-section { background: var(--card); padding: 20px; border-radius: 12px; margin-top: 20px; border: 1px solid #334155; }
+        textarea { height: 100px; background: #0f172a; color: white; resize: none; }
+        input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; accent-color: var(--success); }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="auth-screen" class="auth-box" style="max-width: 400px; margin: 80px auto; text-align: center;">
+        <h1 style="color: #60a5fa; letter-spacing: 2px;">CODE PRO LOGIN</h1>
+        <p style="opacity: 0.6;">Dành riêng cho lộ trình luyện thi của Huy</p>
+        <input type="email" id="email" placeholder="Email (ví dụ: huy@gmail.com)">
+        <input type="password" id="password" placeholder="Mật khẩu">
+        <button onclick="handleAuth('login')">ĐĂNG NHẬP</button>
+        <button onclick="handleAuth('register')" style="background: var(--success);">TẠO TÀI KHOẢN MỚI</button>
+    </div>
+
+    <div id="main-app" class="hidden">
+        <header style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 15px;">
+            <div>
+                <h2 style="color: #60a5fa; margin: 0;">MARISA OJ & CODEFORCES</h2>
+                <small id="user-display" style="opacity: 0.5;"></small>
+            </div>
+            <button onclick="logout()" style="background: #ef4444; width: auto; padding: 8px 15px;">Thoát</button>
+        </header>
+
+        <div class="dashboard">
+            <div class="stat-box">
+                <div style="font-size: 0.9rem; opacity: 0.7;">Tiến độ Roadmap</div>
+                <div style="font-size: 2.2rem; font-weight: bold;" id="percent-val">0%</div>
+                <div class="progress-bg"><div id="progress-fill"></div></div>
+            </div>
+            <div class="stat-box">
+                <div style="font-size: 0.9rem; opacity: 0.7;">Tổng Rating Tích lũy</div>
+                <div style="font-size: 2.2rem; font-weight: bold; color: #fbbf24;" id="total-xp">0 XP</div>
+            </div>
+        </div>
+
+        <div id="roadmap"></div>
+
+        <div class="log-section">
+            <h3>Nhật ký hôm nay</h3>
+            <textarea id="daily-log" placeholder="Hôm nay Huy đã học được thuật toán nào mới? (Lưu để theo dõi tiến độ mỗi ngày)"></textarea>
+            <button onclick="saveLog()" style="width: auto; padding: 10px 25px;">Lưu nhật ký</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- CẤU HÌNH FIREBASE ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyCM-_dxo_CqfMJhyO-XvKEEVxMVS_yN4K0",
+        authDomain: "code-4c17c.firebaseapp.com",
+        projectId: "code-4c17c",
+        storageBucket: "code-4c17c.firebasestorage.app",
+        messagingSenderId: "229078875971",
+        appId: "1:229078875971:web:51a486e70cfbce9370b9f6"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // --- DỮ LIỆU ROADMAP (6 BÀI/CHỦ ĐỀ - TỪ DỄ ĐẾN KHÓ) ---
+    // Cấu trúc: name (Chủ đề), problems (Mã bài CF | Rating giả định)
+    const levels = [
+        { 
+            name: "Level 1: Lập trình cơ bản", 
+            topics: [
+                { title: "Nhập xuất & Điều kiện", problems: ["4A|800", "71A|800", "231A|800", "158A|800", "282A|800", "112A|800"] },
+                { title: "Vòng lặp & Mảng 1 chiều", problems: ["263A|800", "110A|800", "977A|800", "546A|800", "791A|800", "266A|800"] }
+            ]
+        },
+        { 
+            name: "Level 2: Kỹ thuật nâng cao", 
+            topics: [
+                { title: "Sắp xếp & Hai con trỏ", problems: ["1692A|800", "1619A|800", "706B|1100", "580A|900", "279B|1300", "161A|1400"] },
+                { title: "Cửa sổ trượt & Tham lam", problems: ["1873C|800", "158B|1100", "489C|1400", "131A|1000", "1664C|1500", "1077C|1300"] }
+            ]
+        },
+        { 
+            name: "Level 3: Cấu trúc dữ liệu STL", 
+            topics: [
+                { title: "Vector, Set & Map", problems: ["4C|1300", "520A|800", "443A|800", "136A|800", "141A|800", "155A|800"] },
+                { title: "Tìm kiếm nhị phân & Quay lui", problems: ["165B|1200", "1613C|1300", "750A|800", "230B|1300", "1840C|1100", "1619C|1200"] }
+            ]
+        },
+        { 
+            name: "Level 4: Thuật toán Đồ thị & DP", 
+            topics: [
+                { title: "Quy hoạch động cơ bản", problems: ["189A|1300", "706C|1600", "433B|1100", "455A|1500", "118D|1500", "607A|1600"] },
+                { title: "BFS, DFS & Dijkstra", problems: ["520B|1300", "115A|900", "580C|1500", "20C|1900", "1033C|1600", "445B|1300"] }
+            ]
+        },
+        { 
+            name: "Level 5: Chuyên đề HSGQG (Nâng cao)", 
+            topics: [
+                { title: "Segment Tree & Fenwick Tree", problems: ["339D|1700", "459D|1800", "380C|2000", "474F|2100", "1899G|2200", "1904D2|2400"] },
+                { title: "String Hash & KMP", problems: ["271D|1700", "126B|1800", "471D|2100", "526D|2200", "1200E|1700", "1821C|1300"] }
+            ]
+        }
+    ];
+
+    let currentUser = null;
+
+    async function handleAuth(type) {
+        const e = document.getElementById('email').value;
+        const p = document.getElementById('password').value;
+        if(!e || !p) return alert("Huy nhớ nhập đủ email và mật khẩu nha!");
+        try {
+            if(type === 'login') await auth.signInWithEmailAndPassword(e, p);
+            else await auth.createUserWithEmailAndPassword(e, p);
+        } catch (err) { alert("Lỗi rồi: " + err.message); }
+    }
+
+    function logout() { auth.signOut(); location.reload(); }
+
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            currentUser = user;
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            document.getElementById('user-display').innerText = "Chào mừng: " + user.email;
+            loadUserData();
+        }
+    });
+
+    async function loadUserData() {
+        const doc = await db.collection('users').doc(currentUser.uid).get();
+        const data = doc.exists ? doc.data() : { tasks: [], log: "" };
+        renderRoadmap(data.tasks || []);
+        document.getElementById('daily-log').value = data.log || "";
+    }
+
+    function renderRoadmap(completed) {
+        const container = document.getElementById('roadmap');
+        container.innerHTML = '';
+        let totalDone = 0, totalTasks = 0, xp = 0;
+
+        levels.forEach((lvl, lIdx) => {
+            const div = document.createElement('div');
+            div.className = 'level-card';
+            let contentHtml = `<h3 style="color:#60a5fa; margin-top:0">${lvl.name}</h3>`;
+            
+            lvl.topics.forEach((topic, tIdx) => {
+                contentHtml += `<span class="topic-title">${topic.title}</span><div class="task-grid">`;
+                
+                topic.problems.forEach((prob, pIdx) => {
+                    const [code, rating] = prob.split('|');
+                    const id = `${lIdx}-${tIdx}-${pIdx}`;
+                    const isDone = completed.includes(id);
+                    const cfLink = `https://codeforces.com/problemset/problem/${code.replace(/[A-Z]/, '/$&')}`;
+                    
+                    totalTasks++;
+                    if(isDone) { totalDone++; xp += parseInt(rating); }
+
+                    contentHtml += `
+                        <div class="task-item ${isDone ? 'completed' : ''}">
+                            <input type="checkbox" ${isDone ? 'checked' : ''} onchange="toggle('${id}')">
+                            <a href="${cfLink}" target="_blank" class="cf-link">Bài ${code}</a>
+                            <span class="rating-tag">${rating} XP</span>
+                        </div>`;
+                });
+                contentHtml += `</div>`;
+            });
+
+            div.innerHTML = contentHtml;
+            container.appendChild(div);
+        });
+
+        const p = totalTasks > 0 ? Math.round((totalDone/totalTasks)*100) : 0;
+        document.getElementById('percent-val').innerText = p + '%';
+        document.getElementById('progress-fill').style.width = p + '%';
+        document.getElementById('total-xp').innerText = xp.toLocaleString() + ' XP';
+    }
+
+    async function toggle(id) {
+        const doc = await db.collection('users').doc(currentUser.uid).get();
+        let tasks = doc.exists ? (doc.data().tasks || []) : [];
+        if(tasks.includes(id)) tasks = tasks.filter(x => x !== id);
+        else tasks.push(id);
+        await db.collection('users').doc(currentUser.uid).set({ tasks }, { merge: true });
+        loadUserData();
+    }
+
+    async function saveLog() {
+        const log = document.getElementById('daily-log').value;
+        await db.collection('users').doc(currentUser.uid).set({ log }, { merge: true });
+        alert("Nhật ký đã được lưu!");
+    }
+</script>
+</body>
+</html>
